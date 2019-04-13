@@ -1183,7 +1183,7 @@
 #   }
 #   print( plot )
 # }
-}# gehan.obj1<-function( beta, y, delta, matX, wt, n1)
+# gehan.obj1<-function( beta, y, delta, matX, wt, n1)
 # {
 #   # just use D1
 #   # This also works for IPW setting where the wt is the given IPW.

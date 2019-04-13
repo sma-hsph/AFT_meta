@@ -1,11 +1,15 @@
-Package: SurvivalProject
+Package: AFTmeta
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Meta-analysis AFT estimation for survival outcomes with systematically missing covariates
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
+Author: Siyuan Ma
+Maintainer: Siyuan Ma <sim653@mail.harvard.edu>
 Description: More about what it does (maybe more than one line)
     Use four spaces when indenting paragraphs within the Description.
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
+Imports:
+  foreach,
+  doParallel
+RoxygenNote: 6.1.1
