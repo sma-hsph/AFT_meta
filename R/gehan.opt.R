@@ -11,7 +11,8 @@
 #' @param B number of perturbations to perform
 #' @param ncores number of parallel cores to run
 #'
-#' @return A list object with component coef for estimated coefficients and Sigma for estimated covariance matrix
+#' @return A list object with component coef for estimated coefficients and Sigma for estimated 
+#' covariance matrix
 #' @export
 #'
 #' @examples
