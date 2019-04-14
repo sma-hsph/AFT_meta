@@ -8,7 +8,7 @@ gehan.combined.fit(y, delta, matX, matZ, study, missing, wt = rep(1,
   length(y)), beta.ini = NULL)
 }
 \arguments{
-\item{y}{length-n ceonsored time-to-event variable}
+\item{y}{length-n ceonsored log time-to-event variable}
 
 \item{delta}{length-n censoring indicator 1=event 0=censored}
 

@@ -1,7 +1,7 @@
 #' Gehan objective function
 #'
 #' @param beta length-p regression coefficient of AFT model
-#' @param y length-n ceonsored time-to-event variable
+#' @param y length-n ceonsored log time-to-event variable
 #' @param delta length-n censoring indicator 1=event 0=censored
 #' @param matX n*p matrix of covariates
 #' @param wt length-n weight for observations
@@ -38,6 +38,18 @@ gehan.obj <- function(beta, y, delta, matX, wt = rep(1, length(y))) {
 #'
 #' @examples
 alpha.fit <- function(matZ, matX, study, wt = rep(1, nrow(matZ))) {
+  
+  # dimensions must agree
+  if(length(y) != length(delta) | length(y) != nrow(matX) | length(y) != nrow(matZ) |
+     length(y) != length(study) | length(y) != length(missing))
+    stop("Number of samples given by y, delta, matX, matZ, study, missing, and wt must agree!")
+  if(!is.null(beta.ini) & length(beta.ini) != ncol(matX) + ncol(matZ))
+    stop("Number of covariates given by beta.ini and matX must agree!")
+  
+  # missing must be per-study
+  if(any(apply(table(study, missing) > 0, 1, sum) > 1))
+    stop("Missingness must be systematic - either a study has missingness or it doesn't. ",
+         "Check study and missing.")
   # dimensions must agree
   if(nrow(matZ) != nrow(matX) | nrow(matZ) != length(study) | nrow(matZ) != length(wt))
     stop("Number of samples given by matZ, matX, study, and wt must agree!")
@@ -45,11 +57,11 @@ alpha.fit <- function(matZ, matX, study, wt = rep(1, nrow(matZ))) {
   # centering per-study because intercept terms in Gehan obj get canceled out anyway
   studies <- unique(study)
   for(i.study in studies) {
-    ind <- study == i.study
-    matZ[ind, ] <- 
-      t(t(matZ[ind, , drop = FALSE]) - apply(matZ[ind, , drop = FALSE], 2, mean))
+    i.ind <- study == i.study
+    matZ[i.ind, ] <- 
+      t(t(matZ[i.ind, , drop = FALSE]) - apply(matZ[i.ind, , drop = FALSE], 2, mean))
     matX[ind, ] <- 
-      t(t(matX[ind, , drop = FALSE]) - apply(matX[ind, , drop = FALSE], 2, mean))
+      t(t(matX[i.ind, , drop = FALSE]) - apply(matX[i.ind, , drop = FALSE], 2, mean))
   }
   
   # get alpha estimates (Z'WZ)^{-1}Z'WX
@@ -58,7 +70,7 @@ alpha.fit <- function(matZ, matX, study, wt = rep(1, nrow(matZ))) {
 
 #' Naive Gehan estimator for multiple studies
 #'
-#' @param y length-n ceonsored time-to-event variable
+#' @param y length-n ceonsored log time-to-event variable
 #' @param delta length-n censoring indicator 1=event 0=censored
 #' @param matX n*p matrix of covariates
 #' @param study length-n study indicator
@@ -84,9 +96,9 @@ gehan.fit <- function(y, delta, matX,
   
   fn.obj <- function(beta) {
     obj.all <- sapply(unique(study), function(i.study) {
-      ind <- study == i.study
-      gehan.obj(beta = beta, y = y[ind], delta = delta[ind],
-                matX = matX[ind, , drop = FALSE], wt = wt[ind])
+      i.ind <- study == i.study
+      gehan.obj(beta = beta, y = y[i.ind], delta = delta[i.ind],
+                matX = matX[i.ind, , drop = FALSE], wt = wt[i.ind])
     })
     sum(obj.all)
   }
@@ -97,7 +109,7 @@ gehan.fit <- function(y, delta, matX,
 
 #' Combined (non-optimal) Gehan estimator for multiple studies
 #'
-#' @param y length-n ceonsored time-to-event variable
+#' @param y length-n ceonsored log time-to-event variable
 #' @param delta length-n censoring indicator 1=event 0=censored
 #' @param matX n*p_X matrix of always observed covariates
 #' @param matZ n*p_Z matrix of systematically missing covariates
@@ -158,127 +170,106 @@ perturbfn <- function(f, matW, ncores = 1, ...) {
   if(ncores > 1) {
     doParallel::registerDoParallel(ncores)
     betas <- foreach::foreach(i = 1:ncol(matW),
-                     .combine = cbind) %dopar% 
+                              .combine = cbind) %dopar% 
       {return(f(..., wt = matW[, i]))}
     doParallel::stopImplicitCluster()
     return(betas)
   }
 }
 
-beta_fib <- function(y, delta, matX, matZ,
-                     study, missing, B = 500,
-                     beta.ini = NULL, gamma.ini = NULL){
-  beta1 <- sapply(unique(study[!missing]), function(iStudy) {
-    gehan.fit(
-      y = y[study == iStudy],
-      delta = delta[study == iStudy],
-      matX = matX[study == iStudy, , drop = F],
-      matZ = matZ[study == iStudy, , drop = F],
-      study = study[study == iStudy],
-      missing = missing[study == iStudy],
-      beta.ini = beta.ini
-    ) * sum(study == iStudy)
-  }) %>% apply(1, sum) %>% `/`(sum(!missing))
-  gamma1 <- sapply(unique(study[!missing]), function(iStudy) {
-    gehan.fit(
-      y = y[study == iStudy],
-      delta = delta[study == iStudy],
-      matX = matX[study == iStudy, , drop = F],
-      matZ = matrix(NA, sum(study == iStudy), 0),
-      study = study[study == iStudy],
-      missing = missing[study == iStudy],
-      beta.ini = gamma.ini
-    ) * sum(study == iStudy)
-  }) %>% apply(1, sum) %>% `/`(sum(!missing))
-  gamma2 <- sapply(unique(study), function(iStudy) {
-    gehan.fit(
-      y = y[study == iStudy],
-      delta = delta[study == iStudy],
-      matX = matX[study == iStudy, , drop = F],
-      matZ = matrix(NA, sum(study == iStudy), 0),
-      study = study[study == iStudy],
-      missing = missing[study == iStudy],
-      beta.ini = gamma.ini
-    ) * sum(study == iStudy)
-  }) %>% apply(1, sum) %>% `/`(length(y))
+#' Obtain bivariate MLE estimate for the full model coefficients in Fibrinogen estimator
+#'
+#' @param betas p_beta*k_avail matrix of per-study full model coefficient estimates
+#' @param gammas p_gamma*k_total matrix of per-study marginal model coefficient estimates
+#' @param ns length k_total per-study sample size
+#' @param Sigma (p_beta + p_gamma)*(p_beta + p_gamma) matrix of combined covariance of
+#' both beta and gamma
+#'
+#' @return Estimated full model coefficients additionally including studies with 
+#' systematically missing covariates so fitting the full model not possible
+#'
+#' @examples
+beta.mle <- function(betas, gammas, ns, Sigma) {
+  # dimensions must agree
+  if(ncol(gammas) != length(ns))
+    stop("Number of samples given by gammas and ns must agree!")
+  if(nrow(betas) + nrow(gammas) != nrow(Sigma))
+    stop("Number of covariates given by betas + gammas and Sigma must agree!")
   
-  n <- sum(!missing)
-  pX <- ncol(matX)
-  pZ <- ncol(matZ)
-  p <- pX + pZ
-  matWt <- matrix(rexp(n*B), nrow=n, ncol=B)
-  matBeta1Pt <- perturbfn(
-    y = y[!missing],
-    delta = delta[!missing],
-    matX = matX[!missing, , drop = F],
-    matZ = matZ[!missing, , drop = F],
-    study = study[!missing],
-    missing = missing[!missing],
-    matWt = matWt,
-    B = B,
-    beta.ini = beta.ini
-  )
-  matGammaPt <- perturbfn(
-    y = y[!missing],
-    delta = delta[!missing],
-    matX = matX[!missing, , drop = F],
-    matZ = matrix(NA, nrow = sum(!missing), ncol = 0),
-    study = study[!missing],
-    missing = missing[!missing],
-    matWt = matWt,
-    B = B,
-    beta.ini = gamma.ini
-  )
-  matSigmaBetaGammaPt <- cov(cbind(matBeta1Pt, matGammaPt))
-  matSigmaBetaGammaPtInv <- solve(matSigmaBetaGammaPt)
+  p_beta <- nrow(betas)
+  p_gamma <- nrow(gammas)
   
-  (beta1 -
-      solve(matSigmaBetaGammaPtInv[1:p, 1:p],
-            matSigmaBetaGammaPtInv[1:p, (p + 1):(p + pX)]) %*%
-      (gamma2 - gamma1)) %>% as.vector
-}
-
-beta_mi <- function(y, delta, matX, matZ,
-                    study, missing, m = 5,
-                    beta.ini = NULL){
-  matZ_imp <- matZ
-  matZ_imp[missing, ] <- NA
-  pX <- ncol(matX)
-  pZ <- ncol(matZ)
+  # Inverse of covariance matrix and its blocks
+  SigmaInv <- solve(Sigma)
+  SigmaInv_beta <- SigmaInv[1:p_beta, 1:p_beta, drop = FALSE]
+  SigmaInv_betagamma <- SigmaInv[1:p_beta, 
+                                 (p_beta+1):(p_beta + p_gamma), 
+                                 drop = FALSE]
+  SigmaInv_gamma <- SigmaInv[(p_beta+1):(p_beta + p_gamma), 
+                             (p_beta+1):(p_beta + p_gamma), 
+                             drop = FALSE]
   
-  # data frame for imputation
-  df_imp <- data.frame(y, delta, matX, matZ_imp)
-  # prediction matrix for multiple imputation
-  predictorMatrix <- rbind(matrix(0, nrow = 1, ncol = ncol(df_imp)),
-                           matrix(0, nrow = 1, ncol = ncol(df_imp)),
-                           matrix(0, nrow = pX, ncol = ncol(df_imp)),
-                           cbind(rep(1, pZ),
-                                 rep(1, pZ),
-                                 matrix(1, nrow = pZ, ncol = pX),
-                                 matrix(0, nrow = pZ, ncol = pZ))
-  )
-  mi_fit <- mice(data = df_imp,
-                 m = m,
-                 meth = 'norm',
-                 predictorMatrix = predictorMatrix,
-                 printFlag=F)
+  # weighted mean of betas and gammas
+  k_avail <- ncol(betas)
+  k_total <- ncol(gammas)
+  n_avail <- sum(ns[1:k_avail])
+  n_total <- sum(ns)
+  beta_avail <- apply(betas, 1, function(x) sum(x*ns[1:k_avail])/n_avail)
+  gamma_avail <- apply(gammas[, 1:k_avail, drop = FALSE], 1, 
+                       function(x) sum(x*ns[1:k_avail])/n_avail)
+  gamma_total <- apply(gammas, 1, function(x) sum(x*ns)/n_total)
   
-  # generate beta estimate from each dataset and then average
-  sapply(1:m, function(j) {
-    matZ_tmp <- matZ
-    matZ_tmp[missing, ] <- mi_fit$imp[(3 + pX):(2 + pX + pZ)] %>%
-      sapply(function(mat) mat[, j])
-    gehan.fit(
-      y = y,
-      delta = delta,
-      matX = matX,
-      matZ = matZ_tmp,
-      study = study,
-      missing = rep(F, length(y)),
-      beta.ini = beta.ini
-    )
-  }) %>% apply(1, mean)
+  beta_avail - as.vector(solve(n_total*SigmaInv_beta -
+                                 n_avail*SigmaInv_betagamma %*%
+                                 solve(SigmaInv_gamma, t(SigmaInv_betagamma)),
+                               n_total*SigmaInv_betagamma*(gamma_total - gamma_avail)))
 }
 
 
-
+#' Bivariate normal likelihood function. This is to test that beta.mle is correct
+#'
+#' @param mu length-(p_beta + p_gamma) vector of combined true mean of beta and gamma
+#' @param betas p_beta*k_avail matrix of per-study full model coefficient estimates
+#' @param gammas p_gamma*k_total matrix of per-study marginal model coefficient estimates
+#' @param ns length k_total per-study sample size
+#' @param Sigma (p_beta + p_gamma)*(p_beta + p_gamma) matrix of combined covariance of
+#' both beta and gamma
+#'
+#' @return Likelihood value (which can then be optimized)
+#'
+#' @examples
+bivariate.likelihood <- function(mu, betas, gammas, ns, Sigma) {
+  # dimensions must agree
+  if(ncol(gammas) != length(ns))
+    stop("Number of samples given by gammas and ns must agree!")
+  if(nrow(betas) + nrow(gammas) != nrow(Sigma) | length(mu) != nrow(Sigma))
+    stop("Number of covariates given by betas + gammas, mu, and Sigma must agree!")
+  
+  p_beta <- nrow(betas)
+  p_gamma <- nrow(gammas)
+  
+  # Inverse of covariance matrix and its blocks
+  SigmaInv <- solve(Sigma)
+  SigmaInv_gamma <- SigmaInv[(p_beta+1):(p_beta + p_gamma), 
+                             (p_beta+1):(p_beta + p_gamma), 
+                             drop = FALSE]
+  
+  # root n centered and scaled version of betas and gammas for likelihood calculation
+  k_avail <- ncol(betas)
+  k_total <- ncol(gammas)
+  betas.centered.scaled <- t(t(betas - mu[1:p_beta]) * sqrt(ns[1:k_avail]))
+  gammas.centered.scaled <- t(t(gammas - mu[(p_beta + 1):(p_beta + p_gamma)]) * sqrt(ns))
+  mus.centered.scaled <- rbind(betas.centered.scaled, 
+                               gammas.centered.scaled[, 1:k_avail, drop = FALSE])
+  
+  sum(sapply(1:k_avail, function(k) {
+    t(mus.centered.scaled[, k, drop = FALSE]) %*%
+      SigmaInv %*%
+      mus.centered.scaled[, k, drop = FALSE]
+  })) + 
+    sum(sapply((k_avail + 1):k_total, function(k) {
+      t(gammas.centered.scaled[, k, drop = FALSE]) %*%
+        SigmaInv_gamma %*%
+        gammas.centered.scaled[, k, drop = FALSE]
+    }))
+}

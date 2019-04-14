@@ -9,7 +9,7 @@ gehan.obj(beta, y, delta, matX, wt = rep(1, length(y)))
 \arguments{
 \item{beta}{length-p regression coefficient of AFT model}
 
-\item{y}{length-n ceonsored time-to-event variable}
+\item{y}{length-n ceonsored log time-to-event variable}
 
 \item{delta}{length-n censoring indicator 1=event 0=censored}
 
