@@ -1,6 +1,6 @@
-#' Title
+#' Fit optimized Gehan estimator to multipe studies with systematically missing variables.
 #'
-#' @param y length-n ceonsored time-to-event variable
+#' @param y length-n ceonsored log time-to-event variable
 #' @param delta length-n censoring indicator 1=event 0=censored
 #' @param matX n*p_X matrix of always observed covariates
 #' @param matZ n*p_Z matrix of systematically missing covariates
@@ -56,18 +56,19 @@ gehan.opt <- function(y, delta, matX, matZ,
   
   # Calculate the optimal weighting matrix
   matSigmaPt <- cov(t(matBetaPt))
-  matSigmaA <- matSigmaPt[1:p, 1:p] +
-    matSigmaPt[(p+1):(2*p), (p+1):(2*p)] -
-    matSigmaPt[1:p, (p+1):(2*p)] -
-    matSigmaPt[(p+1):(2*p), 1:p]
-  matSigmaB <- matSigmaPt[(p+1):(2*p), (p+1):(2*p)] - 
-    matSigmaPt[(p+1):(2*p), 1:p]
+  matSigmaA <- matSigmaPt[1:p, 1:p, drop = FALSE] +
+    matSigmaPt[(p+1):(2*p), (p+1):(2*p), drop = FALSE] -
+    matSigmaPt[1:p, (p+1):(2*p), drop = FALSE] -
+    matSigmaPt[(p+1):(2*p), 1:p, drop = FALSE]
+  matSigmaB <- matSigmaPt[(p+1):(2*p), (p+1):(2*p), drop = FALSE] - 
+    matSigmaPt[(p+1):(2*p), 1:p, drop = FALSE]
   
   matOpt <- matSigmaB %*% solve(matSigmaA)
   
   # coefficient and covariance estimation
   coef <- as.vector((matOpt %*% beta1 + (diag(1, p) - matOpt) %*% beta2))
-  Sigma <- matSigmaPt[(p+1):(2*p), (p+1):(2*p)] - matOpt %*% matSigmaPt[1:p, (p+1):(2*p)]
+  Sigma <- matSigmaPt[(p+1):(2*p), (p+1):(2*p), drop = FALSE] - 
+    matOpt %*% matSigmaPt[1:p, (p+1):(2*p), drop = FALSE]
   
   return(list(coef = coef, Sigma = Sigma))
 }
