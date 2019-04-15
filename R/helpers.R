@@ -130,7 +130,7 @@ gehan.combined.fit <- function(y, delta, matX, matZ,
      length(y) != length(study) | length(y) != length(missing) | length(y) != length(wt))
     stop("Number of samples given by y, delta, matX, matZ, study, missing, and wt must agree!")
   if(!is.null(beta.ini) & length(beta.ini) != ncol(matX) + ncol(matZ))
-    stop("Number of covariates given by beta.ini and matX must agree!")
+    stop("Number of covariates given by beta.ini and matX + matZ must agree!")
   
   # missing must be per-study
   if(any(apply(table(study, missing) > 0, 1, sum) > 1))
@@ -186,7 +186,8 @@ perturbfn <- function(f, matW, ncores = 1, ...) {
 #' both beta and gamma
 #'
 #' @return Estimated full model coefficients additionally including studies with 
-#' systematically missing covariates so fitting the full model not possible
+#' systematically missing covariates so fitting the full model not possible, and its
+#' variance
 #'
 #' @examples
 beta.mle <- function(betas, gammas, ns, Sigma) {
@@ -217,14 +218,24 @@ beta.mle <- function(betas, gammas, ns, Sigma) {
   beta_avail <- apply(betas, 1, function(x) sum(x*ns[1:k_avail])/n_avail)
   gamma_avail <- apply(gammas[, 1:k_avail, drop = FALSE], 1, 
                        function(x) sum(x*ns[1:k_avail])/n_avail)
-  gamma_total <- apply(gammas, 1, function(x) sum(x*ns)/n_total)
+  gamma_missing <- apply(gammas[, (k_avail + 1):k_total, drop = FALSE], 1, 
+                         function(x) sum(x*ns[(k_avail + 1):k_total]) / 
+                           (n_total - n_avail))
   
-  beta_avail - as.vector(solve(n_total*SigmaInv_beta -
-                                 n_avail*SigmaInv_betagamma %*%
-                                 solve(SigmaInv_gamma, t(SigmaInv_betagamma)),
-                               n_total*SigmaInv_betagamma*(gamma_total - gamma_avail)))
+  matA <- solve(n_total*SigmaInv_beta -
+                  n_avail*SigmaInv_betagamma %*%
+                  solve(SigmaInv_gamma, t(SigmaInv_betagamma)),
+                (n_total - n_avail)*SigmaInv_betagamma)
+  
+  coef <- beta_avail - as.vector(matA %*% (gamma_missing - gamma_avail))
+  Sigma_coef <- Sigma[1:p_beta, 1:p_beta] / n_avail + 
+    A %*% Sigma[(p_beta + 1):(p_beta + p_gamma), 1:p_beta] / n_avail +
+    Sigma[1:p_beta:(p_beta + 1):(p_beta + p_gamma)] %*% t(A) / n_avail +
+    A %*% Sigma[(p_beta + p_gamma):(p_beta + p_gamma)] %*% t(A)
+  
+  return(list(coef = coef,
+              Sigma = Sigma_coef))
 }
-
 
 #' Bivariate normal likelihood function. This is to test that beta.mle is correct
 #'

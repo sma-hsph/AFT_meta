@@ -26,7 +26,7 @@ gehan.opt <- function(y, delta, matX, matZ,
      length(y) != length(study) | length(y) != length(missing))
     stop("Number of samples given by y, delta, matX, matZ, study, missing, and wt must agree!")
   if(!is.null(beta.ini) & length(beta.ini) != ncol(matX) + ncol(matZ))
-    stop("Number of covariates given by beta.ini and matX must agree!")
+    stop("Number of covariates given by beta.ini and matX + matZ must agree!")
   
   # missing must be per-study
   if(any(apply(table(study, missing) > 0, 1, sum) > 1))
@@ -36,10 +36,10 @@ gehan.opt <- function(y, delta, matX, matZ,
   # naive estimator
   beta1 <- gehan.fit(y = y[!missing], delta = delta[!missing], 
                      matX = cbind(matX[!missing, , drop = F], matZ[!missing, , drop = F]),
-                     study = study[!missing])
+                     study = study[!missing], beta.ini = beta.ini)
   # combined estimator
   beta2 <- gehan.combined.fit(y = y, delta = delta, matX = matX, matZ = matZ,
-                              study = study, missing = missing)
+                              study = study, missing = missing, beta.ini = beta.ini)
   
   
   # perturb to estimate Sigma_{beta1, beta2}
@@ -49,10 +49,10 @@ gehan.opt <- function(y, delta, matX, matZ,
   matBeta1Pt <- perturbfn(f = gehan.fit, matW = matW[!missing, ], ncores = ncores,
                           y = y[!missing], delta = delta[!missing], 
                           matX = cbind(matX[!missing, , drop = F], matZ[!missing, , drop = F]),
-                          study = study[!missing])
+                          study = study[!missing], beta.ini = beta.ini)
   matBeta2Pt <- perturbfn(f = gehan.combined.fit, matW = matW, ncores = ncores,
                           y = y, delta = delta, matX = matX, matZ = matZ,
-                          study = study, missing = missing)
+                          study = study, missing = missing, beta.ini = beta.ini)
   matBetaPt <- rbind(matBeta1Pt, matBeta2Pt)
   
   # Calculate the optimal weighting matrix

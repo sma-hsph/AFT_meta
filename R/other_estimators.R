@@ -1,3 +1,109 @@
+#' Fit naive (i.e., only with full observations) Gehan estimator to multipe studies with 
+#' systematically missing variables.
+#'
+#' @param y length-n ceonsored log time-to-event variable
+#' @param delta length-n censoring indicator 1=event 0=censored
+#' @param matX n*p_X matrix of always observed covariates
+#' @param matZ n*p_Z matrix of systematically missing covariates
+#' @param study length-n study indicator
+#' @param missing length-n TRUE/FALSE missingness indicator TRUE=Z is missing FALSE=not missing
+#' @param beta.ini initial coefficient value for optimization; will estimate from lm if not
+#' provided
+#' @param B number of perturbations to perform
+#' @param ncores number of parallel cores to run
+#'
+#' @return A list object with component coef for estimated coefficients and Sigma for estimated 
+#' covariance matrix
+#' @export
+#'
+#' @examples
+gehan.obs <- function(y, delta, matX, matZ,
+                      study, missing,
+                      beta.ini = NULL,
+                      B = 30,
+                      ncores = 1) {
+  # dimensions must agree
+  if(length(y) != length(delta) | length(y) != nrow(matX) | length(y) != nrow(matZ) |
+     length(y) != length(study) | length(y) != length(missing))
+    stop("Number of samples given by y, delta, matX, matZ, study, missing, and wt must agree!")
+  if(!is.null(beta.ini) & length(beta.ini) != ncol(matX) + ncol(matZ))
+    stop("Number of covariates given by beta.ini and matX + matZ must agree!")
+  
+  # missing must be per-study
+  if(any(apply(table(study, missing) > 0, 1, sum) > 1))
+    stop("Missingness must be systematic - either a study has missingness or it doesn't. ",
+         "Check study and missing.")
+  
+  # naive estimator
+  coef <- gehan.fit(y = y[!missing], delta = delta[!missing], 
+                    matX = cbind(matX[!missing, , drop = F], matZ[!missing, , drop = F]),
+                    study = study[!missing], beta.ini = beta.ini)
+  
+  # perturb to estimate Sigma
+  n <- length(y)
+  p <- ncol(matX) + ncol(matZ)
+  matW <- matrix(rexp(n*B), nrow=n, ncol=B)
+  matBetaPt <- perturbfn(f = gehan.fit, matW = matW[!missing, ], ncores = ncores,
+                         y = y[!missing], delta = delta[!missing], 
+                         matX = cbind(matX[!missing, , drop = F], matZ[!missing, , drop = F]),
+                         study = study[!missing], beta.ini = beta.ini)
+  Sigma <- cov(t(matBetaPt))
+  
+  return(list(coef = coef, Sigma = Sigma))
+}
+
+#' Fit combined Gehan estimator to multipe studies with systematically missing variables.
+#'
+#' @param y length-n ceonsored log time-to-event variable
+#' @param delta length-n censoring indicator 1=event 0=censored
+#' @param matX n*p_X matrix of always observed covariates
+#' @param matZ n*p_Z matrix of systematically missing covariates
+#' @param study length-n study indicator
+#' @param missing length-n TRUE/FALSE missingness indicator TRUE=Z is missing FALSE=not missing
+#' @param beta.ini initial coefficient value for optimization; will estimate from lm if not
+#' provided
+#' @param B number of perturbations to perform
+#' @param ncores number of parallel cores to run
+#'
+#' @return A list object with component coef for estimated coefficients and Sigma for estimated 
+#' covariance matrix
+#' @export
+#'
+#' @examples
+gehan.full <- function(y, delta, matX, matZ,
+                       study, missing,
+                       beta.ini = NULL,
+                       B = 30,
+                       ncores = 1) {
+  # dimensions must agree
+  if(length(y) != length(delta) | length(y) != nrow(matX) | length(y) != nrow(matZ) |
+     length(y) != length(study) | length(y) != length(missing))
+    stop("Number of samples given by y, delta, matX, matZ, study, missing, and wt must agree!")
+  if(!is.null(beta.ini) & length(beta.ini) != ncol(matX) + ncol(matZ))
+    stop("Number of covariates given by beta.ini and matX + matZ must agree!")
+  
+  # missing must be per-study
+  if(any(apply(table(study, missing) > 0, 1, sum) > 1))
+    stop("Missingness must be systematic - either a study has missingness or it doesn't. ",
+         "Check study and missing.")
+  
+  # combined estimator
+  coef <- gehan.combined.fit(y = y, delta = delta, matX = matX, matZ = matZ,
+                              study = study, missing = missing, beta.ini = beta.ini)
+  
+  
+  # perturb to estimate Sigma
+  n <- length(y)
+  p <- ncol(matX) + ncol(matZ)
+  matW <- matrix(rexp(n*B), nrow=n, ncol=B)
+  matBetaPt <- perturbfn(f = gehan.combined.fit, matW = matW, ncores = ncores,
+                          y = y, delta = delta, matX = matX, matZ = matZ,
+                          study = study, missing = missing, beta.ini = beta.ini)
+  Sigma <- cov(t(matBetaPt))
+  
+  return(list(coef = coef, Sigma = Sigma))
+} 
+
 #' Fit AFT version of Fibrinogen{19222087} estimator to multipe studies with 
 #' systematically missing variables.
 #'
@@ -29,7 +135,9 @@ gehan.fib <- function(y, delta, matX, matZ,
      length(y) != length(study) | length(y) != length(missing))
     stop("Number of samples given by y, delta, matX, matZ, study, missing, and wt must agree!")
   if(!is.null(beta.ini) & length(beta.ini) != ncol(matX) + ncol(matZ))
-    stop("Number of covariates given by beta.ini and matX must agree!")
+    stop("Number of covariates given by beta.ini and matX + matZ must agree!")
+  if(!is.null(gamma.ini) & length(gamma.ini) != ncol(matX))
+    stop("Number of covariates given by gamma.ini and matX must agree!")
   
   # missing must be per-study
   missingness <- table(study, missing) > 0
@@ -54,21 +162,21 @@ gehan.fib <- function(y, delta, matX, matZ,
     i.n <- sum(i.ind)
     i.beta <- gehan.fit(y = y[i.ind], delta = delta[i.ind], 
                         matX = cbind(matX, matZ)[i.ind, , drop = FALSE],
-                        study = study[i.ind])
+                        study = study[i.ind], beta.ini = beta.ini)
     i.gamma <- gehan.fit(y = y[i.ind], delta = delta[i.ind], 
                          matX = matX[i.ind, , drop = FALSE],
-                         study = study[i.ind])
+                         study = study[i.ind], beta.ini = gamma.ini)
     
     # perturbing to estimate covariance matrix
     i.matW <- matrix(rexp(i.n*B), nrow=n, ncol=B)
     i.matBetaPt <- perturbfn(f = gehan.fit, matW = i.matW, ncores = ncores,
                              y = y[i.ind], delta = delta[i.ind], 
                              matX = cbind(matX, matZ)[i.ind, , drop = FALSE],
-                             study = study[i.ind])
+                             study = study[i.ind], beta.ini = beta.ini)
     i.matGammaPt <- perturbfn(f = gehan.fit, matW = i.matW, ncores = ncores,
                               y = y[i.ind], delta = delta[i.ind], 
                               matX = matX[i.ind, , drop = FALSE],
-                              study = study[i.ind])
+                              study = study[i.ind], beta.ini = gamma.ini)
     i.Sigma <- cov(t(rbind(i.matBetaPt, i.matGammaPt)))
     
     matBeta <- cbind(matBeta, i.beta)
@@ -82,14 +190,14 @@ gehan.fib <- function(y, delta, matX, matZ,
     i.n <- sum(i.ind)
     i.gamma <- gehan.fit(y = y[i.ind], delta = delta[i.ind], 
                          matX = matX[i.ind, , drop = FALSE],
-                         study = study[i.ind])
+                         study = study[i.ind], beta.ini = gamma.ini)
     
     # perturbing to estimate covariance matrix
     i.matW <- matrix(rexp(i.n*B), nrow=n, ncol=B)
     i.matGammaPt <- perturbfn(f = gehan.fit, matW = i.matW, ncores = ncores,
                               y = y[i.ind], delta = delta[i.ind], 
                               matX = matX[i.ind, , drop = FALSE],
-                              study = study[i.ind])
+                              study = study[i.ind], beta.ini = gamma.ini)
     i.Sigma <- cov(t(i.matGammaPt))
     
     matGamma <- cbind(matGamma, i.gamma)
@@ -112,13 +220,31 @@ gehan.fib <- function(y, delta, matX, matZ,
                        sqrt(ns[length(lSigma) + i])))) /
     length(ns)
   
-  coef <- beta.mle(betas = matBeta, gammas = matGamma, ns = ns, Sigma = Sigma)
-  return(list(coef = coef))
+  return(beta.mle(betas = matBeta, gammas = matGamma, ns = ns, Sigma = Sigma))
 }
 
-beta_mi <- function(y, delta, matX, matZ,
-                    study, missing, m = 5,
-                    beta.ini = NULL){
+#' Fit AFT version of multiple imputation{23857554} estimator to multipe studies with 
+#' systematically missing variables.
+#'
+#' @param y length-n ceonsored log time-to-event variable
+#' @param delta length-n censoring indicator 1=event 0=censored
+#' @param matX n*p_X matrix of always observed covariates
+#' @param matZ n*p_Z matrix of systematically missing covariates
+#' @param study length-n study indicator
+#' @param missing length-n TRUE/FALSE missingness indicator TRUE=Z is missing FALSE=not missing
+#' @param beta.ini initial coefficient value for optimization; will estimate from lm if not
+#' provided
+#' @param m number of multiple imputations
+#'
+#' @return A list object with component coef for estimated coefficients and Sigma for estimated 
+#' covariance matrix. Currently covariance is not provided
+#' @export
+#'
+#' @examples
+gehan.mi <- function(y, delta, matX, matZ,
+                     study, missing,
+                     beta.ini = NULL,
+                     m = 5){
   matZ_imp <- matZ
   matZ_imp[missing, ] <- NA
   pX <- ncol(matX)
@@ -135,39 +261,31 @@ beta_mi <- function(y, delta, matX, matZ,
                                  matrix(1, nrow = pZ, ncol = pX),
                                  matrix(0, nrow = pZ, ncol = pZ))
   )
-  mi_fit <- mice(data = df_imp,
-                 m = m,
-                 meth = 'norm',
-                 predictorMatrix = predictorMatrix,
-                 printFlag=F)
+  mi_fit <- mice::mice(data = df_imp,
+                       m = m,
+                       meth = "norm",
+                       predictorMatrix = predictorMatrix,
+                       printFlag=F)
   
-  # generate beta estimate from each dataset and then average
-  sapply(1:m, function(j) {
+  # generate beta estimate from each imputation and then average
+  matCoef <- sapply(1:m, function(j) {
     matZ_tmp <- matZ
-    matZ_tmp[missing, ] <- mi_fit$imp[(3 + pX):(2 + pX + pZ)] %>%
-      sapply(function(mat) mat[, j])
+    matZ_tmp[missing, ] <- sapply(mi_fit$imp[(3 + pX):(2 + pX + pZ)], 
+                                  function(mat) mat[, j])
     gehan.fit(
       y = y,
       delta = delta,
       matX = matX,
       matZ = matZ_tmp,
       study = study,
-      missing = rep(F, length(y)),
       beta.ini = beta.ini
     )
-  }) %>% apply(1, mean)
+  })
+  coef <- apply(matCoef, 1, mean)
+  
+  return(list(coef = coef,
+              Sigma = NULL ## FIXME It's not clear to me how to compute Sigma
+              # Given that perturbation can't be incorporated into multiple 
+              # imputation
+              ))
 }
-
-
-# some numeric testing?
-Sigma <- matrix(c(1, 0.5, 0.5, 1), 2, 2)
-betahat <- c(1)
-gammahat <- c(1, 2)
-likelihood <- function(mu) {
-  (betahat - mu[1])^2 * Sigma[1, 1] + 
-    2*(betahat - mu[1])*Sigma[1, 2]*(gammahat[1] - mu[2]) +
-    (gammahat[1] - mu[2])^2 * Sigma[2, 2] +
-    (gammahat[2] - mu[2])^2 * Sigma[2, 2] 
-}
-1 / (2*Sigma[1, 1] - 1*Sigma[1, 2]/Sigma[2, 2]*Sigma[1, 2]) * 
-  Sigma[1, 2]*2*(mean(gammahat) - gammahat[1])

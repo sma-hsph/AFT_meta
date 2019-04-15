@@ -18,7 +18,8 @@ both beta and gamma}
 }
 \value{
 Estimated full model coefficients additionally including studies with 
-systematically missing covariates so fitting the full model not possible
+systematically missing covariates so fitting the full model not possible, and its
+variance
 }
 \description{
 Obtain bivariate MLE estimate for the full model coefficients in Fibrinogen estimator
