@@ -149,7 +149,7 @@ gehan.fib <- function(y, delta, matX, matZ,
   
   # Fit full/marginal models per-study, record coefficient and covariance estimates
   studies <- unique(study)
-  p_beta <- ncol(matX)
+  p_beta <- ncol(matX) + ncol(matZ)
   p_gamma <- ncol(matZ)
   matBeta <- matrix(nrow = p_beta, ncol = 0)
   matGamma <- matrix(nrow = p_gamma, ncol = 0)
@@ -158,7 +158,7 @@ gehan.fib <- function(y, delta, matX, matZ,
   lSigmaGamma <- list()
   # Estimations for studies with all covariates
   for (i.study in studies[!missingness]) {
-    i.ind <- studies == i.study
+    i.ind <- study == i.study
     i.n <- sum(i.ind)
     i.beta <- gehan.fit(y = y[i.ind], delta = delta[i.ind], 
                         matX = cbind(matX, matZ)[i.ind, , drop = FALSE],
@@ -168,7 +168,7 @@ gehan.fib <- function(y, delta, matX, matZ,
                          study = study[i.ind], beta.ini = gamma.ini)
     
     # perturbing to estimate covariance matrix
-    i.matW <- matrix(rexp(i.n*B), nrow=n, ncol=B)
+    i.matW <- matrix(rexp(i.n*B), nrow=i.n, ncol=B)
     i.matBetaPt <- perturbfn(f = gehan.fit, matW = i.matW, ncores = ncores,
                              y = y[i.ind], delta = delta[i.ind], 
                              matX = cbind(matX, matZ)[i.ind, , drop = FALSE],
@@ -182,18 +182,18 @@ gehan.fib <- function(y, delta, matX, matZ,
     matBeta <- cbind(matBeta, i.beta)
     matGamma <- cbind(matGamma, i.gamma)
     ns <- c(ns, i.n)
-    lSigma <- c(lSigma, i.Sigma)
+    lSigma <- c(lSigma, list(i.Sigma))
   }
   # Estimations for studies where some covariates are systematically missing
   for (i.study in studies[missingness]) {
-    i.ind <- studies == i.study
+    i.ind <- study == i.study
     i.n <- sum(i.ind)
     i.gamma <- gehan.fit(y = y[i.ind], delta = delta[i.ind], 
                          matX = matX[i.ind, , drop = FALSE],
                          study = study[i.ind], beta.ini = gamma.ini)
     
     # perturbing to estimate covariance matrix
-    i.matW <- matrix(rexp(i.n*B), nrow=n, ncol=B)
+    i.matW <- matrix(rexp(i.n*B), nrow=i.n, ncol=B)
     i.matGammaPt <- perturbfn(f = gehan.fit, matW = i.matW, ncores = ncores,
                               y = y[i.ind], delta = delta[i.ind], 
                               matX = matX[i.ind, , drop = FALSE],
@@ -202,14 +202,12 @@ gehan.fib <- function(y, delta, matX, matZ,
     
     matGamma <- cbind(matGamma, i.gamma)
     ns <- c(ns, i.n)
-    lSigmaGamma <- c(lSigmaGamma, i.Sigma)
+    lSigmaGamma <- c(lSigmaGamma, list(i.Sigma))
   }
   
   # Estimate Sigma
   # Currently this is estimated as average of Sigmas across studies scaled by root n
   ## FIXME??
-  p_beta <- ncol(matX)
-  p_gamma <- ncol(matZ)
   Sigma <- Reduce("+",
                   lapply(1:length(lSigma), function(i) lSigma[[i]] * sqrt(ns[i]))) /
     length(lSigma)
@@ -275,8 +273,7 @@ gehan.mi <- function(y, delta, matX, matZ,
     gehan.fit(
       y = y,
       delta = delta,
-      matX = matX,
-      matZ = matZ_tmp,
+      matX = cbind(matX, matZ_tmp),
       study = study,
       beta.ini = beta.ini
     )

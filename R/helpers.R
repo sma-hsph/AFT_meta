@@ -38,18 +38,6 @@ gehan.obj <- function(beta, y, delta, matX, wt = rep(1, length(y))) {
 #'
 #' @examples
 alpha.fit <- function(matZ, matX, study, wt = rep(1, nrow(matZ))) {
-  
-  # dimensions must agree
-  if(length(y) != length(delta) | length(y) != nrow(matX) | length(y) != nrow(matZ) |
-     length(y) != length(study) | length(y) != length(missing))
-    stop("Number of samples given by y, delta, matX, matZ, study, missing, and wt must agree!")
-  if(!is.null(beta.ini) & length(beta.ini) != ncol(matX) + ncol(matZ))
-    stop("Number of covariates given by beta.ini and matX must agree!")
-  
-  # missing must be per-study
-  if(any(apply(table(study, missing) > 0, 1, sum) > 1))
-    stop("Missingness must be systematic - either a study has missingness or it doesn't. ",
-         "Check study and missing.")
   # dimensions must agree
   if(nrow(matZ) != nrow(matX) | nrow(matZ) != length(study) | nrow(matZ) != length(wt))
     stop("Number of samples given by matZ, matX, study, and wt must agree!")
@@ -60,7 +48,7 @@ alpha.fit <- function(matZ, matX, study, wt = rep(1, nrow(matZ))) {
     i.ind <- study == i.study
     matZ[i.ind, ] <- 
       t(t(matZ[i.ind, , drop = FALSE]) - apply(matZ[i.ind, , drop = FALSE], 2, mean))
-    matX[ind, ] <- 
+    matX[i.ind, ] <- 
       t(t(matX[i.ind, , drop = FALSE]) - apply(matX[i.ind, , drop = FALSE], 2, mean))
   }
   
@@ -102,7 +90,7 @@ gehan.fit <- function(y, delta, matX,
     })
     sum(obj.all)
   }
-  fit <- optim(beta.ini, fn.obj)
+  fit <- optim(beta.ini, fn.obj, method = "BFGS")
   fit$par
 }
 
@@ -168,7 +156,8 @@ perturbfn <- function(f, matW, ncores = 1, ...) {
     return(Reduce("cbind", l.beta))
   }
   if(ncores > 1) {
-    doParallel::registerDoParallel(ncores)
+    doParallel::registerDoParallel(ncores) ## FIXME?
+    ## not sure if this is the right way to implement parallel inside a function
     betas <- foreach::foreach(i = 1:ncol(matW),
                               .combine = cbind) %dopar% 
       {return(f(..., wt = matW[, i]))}
@@ -204,34 +193,41 @@ beta.mle <- function(betas, gammas, ns, Sigma) {
   SigmaInv <- solve(Sigma)
   SigmaInv_beta <- SigmaInv[1:p_beta, 1:p_beta, drop = FALSE]
   SigmaInv_betagamma <- SigmaInv[1:p_beta, 
-                                 (p_beta+1):(p_beta + p_gamma), 
+                                 (p_beta+1):(p_beta+p_gamma), 
                                  drop = FALSE]
-  SigmaInv_gamma <- SigmaInv[(p_beta+1):(p_beta + p_gamma), 
-                             (p_beta+1):(p_beta + p_gamma), 
+  SigmaInv_gamma <- SigmaInv[(p_beta+1):(p_beta+p_gamma), 
+                             (p_beta+1):(p_beta+p_gamma), 
                              drop = FALSE]
+  SigmaGamma_Inv <- solve(Sigma[(p_beta+1):(p_beta+p_gamma), 
+                                (p_beta+1):(p_beta+p_gamma), 
+                                drop = FALSE])
   
   # weighted mean of betas and gammas
   k_avail <- ncol(betas)
   k_total <- ncol(gammas)
   n_avail <- sum(ns[1:k_avail])
   n_total <- sum(ns)
+  n_missing <- n_total - n_avail
   beta_avail <- apply(betas, 1, function(x) sum(x*ns[1:k_avail])/n_avail)
   gamma_avail <- apply(gammas[, 1:k_avail, drop = FALSE], 1, 
                        function(x) sum(x*ns[1:k_avail])/n_avail)
-  gamma_missing <- apply(gammas[, (k_avail + 1):k_total, drop = FALSE], 1, 
-                         function(x) sum(x*ns[(k_avail + 1):k_total]) / 
-                           (n_total - n_avail))
+  gamma_missing <- apply(gammas[, (k_avail+1):k_total, drop = FALSE], 1, 
+                         function(x) sum(x*ns[(k_avail+1):k_total]) / n_missing)
   
-  matA <- solve(n_total*SigmaInv_beta -
-                  n_avail*SigmaInv_betagamma %*%
-                  solve(SigmaInv_gamma, t(SigmaInv_betagamma)),
-                (n_total - n_avail)*SigmaInv_betagamma)
+  matA <- solve(SigmaInv_gamma + n_missing/n_avail*SigmaGamma_Inv)
+  matB <- solve(SigmaInv_betagamma %*% matA %*% t(SigmaInv_betagamma) - SigmaInv_beta)
+  matC <- SigmaInv_betagamma %*% matA %*% SigmaInv_gamma - SigmaInv_betagamma
+  matD <- n_missing/n_avail * SigmaInv_betagamma %*% matA %*% SigmaGamma_Inv
   
-  coef <- beta_avail - as.vector(matA %*% (gamma_missing - gamma_avail))
+  coef <- as.vector(beta_avail + matB %*% matC %*% gamma_avail + matB %*% matD %*% gamma_missing)
   Sigma_coef <- Sigma[1:p_beta, 1:p_beta] / n_avail + 
-    A %*% Sigma[(p_beta + 1):(p_beta + p_gamma), 1:p_beta] / n_avail +
-    Sigma[1:p_beta:(p_beta + 1):(p_beta + p_gamma)] %*% t(A) / n_avail +
-    A %*% Sigma[(p_beta + p_gamma):(p_beta + p_gamma)] %*% t(A)
+    matB %*% matC %*% Sigma[(p_beta+1):(p_beta+p_gamma), 1:p_beta] / n_avail +
+    Sigma[(1:p_beta),(p_beta+1):(p_beta+p_gamma)] %*% t(matB %*% matC) / n_avail +
+    matB %*% matC %*% 
+    Sigma[(p_beta+1):(p_beta+p_gamma), (p_beta+1):(p_beta+p_gamma)] %*% 
+    t(matB %*% matC)/ n_avail +
+    matB %*% matD %*% 
+    Sigma[(p_beta+p_gamma):(p_beta+p_gamma)] %*% t(matB %*% matD) / n_missing
   
   return(list(coef = coef,
               Sigma = Sigma_coef))
@@ -261,9 +257,9 @@ bivariate.likelihood <- function(mu, betas, gammas, ns, Sigma) {
   
   # Inverse of covariance matrix and its blocks
   SigmaInv <- solve(Sigma)
-  SigmaInv_gamma <- SigmaInv[(p_beta+1):(p_beta + p_gamma), 
-                             (p_beta+1):(p_beta + p_gamma), 
-                             drop = FALSE]
+  SigmaGamma_Inv <- solve(Sigma[(p_beta+1):(p_beta + p_gamma), 
+                                (p_beta+1):(p_beta + p_gamma), 
+                                drop = FALSE])
   
   # root n centered and scaled version of betas and gammas for likelihood calculation
   k_avail <- ncol(betas)
@@ -280,7 +276,7 @@ bivariate.likelihood <- function(mu, betas, gammas, ns, Sigma) {
   })) + 
     sum(sapply((k_avail + 1):k_total, function(k) {
       t(gammas.centered.scaled[, k, drop = FALSE]) %*%
-        SigmaInv_gamma %*%
+        SigmaGamma_Inv %*%
         gammas.centered.scaled[, k, drop = FALSE]
     }))
 }
