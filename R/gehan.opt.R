@@ -69,7 +69,7 @@ gehan.opt <- function(y, delta, matX, matZ,
   # coefficient and covariance estimation
   coef <- as.vector((matOpt %*% beta1 + (diag(1, p) - matOpt) %*% beta2))
   Sigma <- matSigmaPt[(p+1):(2*p), (p+1):(2*p), drop = FALSE] - 
-    matOpt %*% matSigmaPt[1:p, (p+1):(2*p), drop = FALSE]
+    matOpt %*% t(matSigmaB)
   
   return(list(coef = coef, Sigma = Sigma))
 }
