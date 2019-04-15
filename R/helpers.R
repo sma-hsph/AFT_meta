@@ -126,8 +126,8 @@ gehan.combined.fit <- function(y, delta, matX, matZ,
          "Check study and missing.")
   
   # fill in the systematicly missing covariates using lm coefficients estimated from full datasets
-  mat.alpha <- alpha.fit(matX[!missing, , drop = FALSE],
-                         matZ[!missing, , drop = FALSE],
+  mat.alpha <- alpha.fit(matZ = matZ[!missing, , drop = FALSE],
+                         matX = matX[!missing, , drop = FALSE],
                          study[!missing],
                          wt = wt[!missing])
   matZ[missing, ] <- matX[missing, , drop = FALSE] %*% mat.alpha
