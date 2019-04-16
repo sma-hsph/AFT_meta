@@ -150,7 +150,7 @@ gehan.fib <- function(y, delta, matX, matZ,
   # Fit full/marginal models per-study, record coefficient and covariance estimates
   studies <- unique(study)
   p_beta <- ncol(matX) + ncol(matZ)
-  p_gamma <- ncol(matZ)
+  p_gamma <- ncol(matX)
   matBeta <- matrix(nrow = p_beta, ncol = 0)
   matGamma <- matrix(nrow = p_gamma, ncol = 0)
   ns <- c()
