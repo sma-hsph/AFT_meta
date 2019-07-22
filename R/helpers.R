@@ -220,14 +220,14 @@ beta.mle <- function(betas, gammas, ns, Sigma) {
   matD <- n_missing/n_avail * SigmaInv_betagamma %*% matA %*% SigmaGamma_Inv
   
   coef <- as.vector(beta_avail + matB %*% matC %*% gamma_avail + matB %*% matD %*% gamma_missing)
-  Sigma_coef <- Sigma[1:p_beta, 1:p_beta] + 
-    matB %*% matC %*% Sigma[(p_beta+1):(p_beta+p_gamma), 1:p_beta] +
-    Sigma[(1:p_beta),(p_beta+1):(p_beta+p_gamma)] %*% t(matB %*% matC) +
+  Sigma_coef <- Sigma[1:p_beta, 1:p_beta] / n_avail + 
+    matB %*% matC %*% Sigma[(p_beta+1):(p_beta+p_gamma), 1:p_beta] / n_avail +
+    Sigma[(1:p_beta),(p_beta+1):(p_beta+p_gamma)] %*% t(matB %*% matC)  / n_avail +
     matB %*% matC %*% 
     Sigma[(p_beta+1):(p_beta+p_gamma), (p_beta+1):(p_beta+p_gamma)] %*% 
-    t(matB %*% matC) +
+    t(matB %*% matC)  / n_avail +
     matB %*% matD %*% 
-    Sigma[(p_beta+1):(p_beta+p_gamma),(p_beta+1):(p_beta+p_gamma)] %*% t(matB %*% matD)
+    Sigma[(p_beta+1):(p_beta+p_gamma),(p_beta+1):(p_beta+p_gamma)] %*% t(matB %*% matD)  / n_missing
   
   return(list(coef = coef,
               Sigma = Sigma_coef))
