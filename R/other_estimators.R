@@ -209,14 +209,14 @@ gehan.fib <- function(y, delta, matX, matZ,
   # Currently this is estimated as average of Sigmas across studies scaled by root n
   ## FIXME??
   Sigma <- Reduce("+",
-                  lapply(1:length(lSigma), function(i) lSigma[[i]] * sqrt(ns[i]))) /
-    length(lSigma)
+                  lapply(1:length(lSigma), function(i) lSigma[[i]] * ns[i])) /
+    sum(ns[1:length(lSigma)])
   Sigma[(p_beta+1):(p_beta + p_gamma), (p_beta+1):(p_beta + p_gamma)] <- 
-    (Sigma[(p_beta+1):(p_beta + p_gamma), (p_beta+1):(p_beta + p_gamma)] * length(lSigma) +
+    (Sigma[(p_beta+1):(p_beta + p_gamma), (p_beta+1):(p_beta + p_gamma)] * sum(ns[1:length(lSigma)]) +
        Reduce("+",
               lapply(1:length(lSigmaGamma), function(i) lSigmaGamma[[i]] * 
-                       sqrt(ns[length(lSigma) + i])))) /
-    length(ns)
+                       ns[length(lSigma) + i]))) /
+    sum(ns)
   
   return(beta.mle(betas = matBeta, gammas = matGamma, ns = ns, Sigma = Sigma))
 }
