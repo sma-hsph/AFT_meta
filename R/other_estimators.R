@@ -247,6 +247,22 @@ gehan.mi <- function(y, delta, matX, matZ,
   matZ_imp[missing, ] <- NA
   pX <- ncol(matX)
   pZ <- ncol(matZ)
+  if(pZ != 1)
+    stop("Currently only one systematically missing covariate is supported!")
+  
+  df_lme <- as.data.frame(cbind(matZ, y, delta, matX, study))
+  formula_fixed <- as.formula(
+    paste(c(colnames(df_lme)[1], "~",
+            paste(colnames(df_lme)[2:(ncol(df_lme) - 1)],
+                  collapse = "+")),
+          collapse = "")
+  )
+  formula_random <- as.formula(
+    paste0("~1|", colnames(df_lme)[ncol(df_lme)])
+  )
+  fit_lme <- nlme::lme(fixed = formula_fixed, 
+                       data = df_lme, 
+                       random = formula_random)
   
   # data frame for imputation
   df_imp <- data.frame(y, delta, matX, matZ_imp)
