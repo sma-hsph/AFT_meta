@@ -195,12 +195,12 @@ beta.mle <- function(betas, gammas, ns, Sigma) {
   SigmaInv_betagamma <- SigmaInv[1:p_beta, 
                                  (p_beta+1):(p_beta+p_gamma), 
                                  drop = FALSE]
-  SigmaInv_gamma <- SigmaInv[(p_beta+1):(p_beta+p_gamma), 
-                             (p_beta+1):(p_beta+p_gamma), 
-                             drop = FALSE]
-  SigmaGamma_Inv <- solve(Sigma[(p_beta+1):(p_beta+p_gamma), 
-                                (p_beta+1):(p_beta+p_gamma), 
-                                drop = FALSE])
+  # SigmaInv_gamma <- SigmaInv[(p_beta+1):(p_beta+p_gamma), 
+  #                            (p_beta+1):(p_beta+p_gamma), 
+  #                            drop = FALSE]
+  # SigmaGamma_Inv <- solve(Sigma[(p_beta+1):(p_beta+p_gamma), 
+  #                               (p_beta+1):(p_beta+p_gamma), 
+  #                               drop = FALSE])
   
   # weighted mean of betas and gammas
   k_avail <- ncol(betas)
@@ -214,26 +214,22 @@ beta.mle <- function(betas, gammas, ns, Sigma) {
   gamma_missing <- apply(gammas[, (k_avail+1):k_total, drop = FALSE], 1, 
                          function(x) sum(x*ns[(k_avail+1):k_total]) / n_missing)
   
-  # matA <- n_total / n_missing * Sigma[(p_beta+1):(p_beta+p_gamma), 
-  #                                     (p_beta+1):(p_beta+p_gamma), 
-  #                                     drop = FALSE]
   matA <- solve(SigmaInv_beta) %*% SigmaInv_betagamma * n_missing / n_total
-  # matC <- matD <- n_missing / n_avail * SigmaGamma_Inv
-
+  
   coef <- as.vector(beta_avail + 
                       matA %*% gamma_avail - 
                       matA %*% gamma_missing)
-  Sigma_coef <- Sigma[1:p_beta, 1:p_beta] / n_avail + 
+  Sigma_coef <- Sigma[1:p_beta, 1:p_beta] + 
     matA %*% 
-    Sigma[(p_beta+1):(p_beta+p_gamma), 1:p_beta] / n_avail +
+    Sigma[(p_beta+1):(p_beta+p_gamma), 1:p_beta] +
     Sigma[(1:p_beta),(p_beta+1):(p_beta+p_gamma)] %*%
-    t(matA) / n_avail +
+    t(matA) +
     matA %*%
     Sigma[(p_beta+1):(p_beta+p_gamma), (p_beta+1):(p_beta+p_gamma)] %*% 
-    t(matA) / n_avail +
+    t(matA) +
     matA %*% 
     Sigma[(p_beta+1):(p_beta+p_gamma),(p_beta+1):(p_beta+p_gamma)] %*% 
-    t(matA) / n_missing
+    t(matA)
   
   return(list(coef = coef,
               Sigma = Sigma_coef))
