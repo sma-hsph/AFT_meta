@@ -220,16 +220,14 @@ beta.mle <- function(betas, gammas, ns, Sigma) {
                       matA %*% gamma_avail - 
                       matA %*% gamma_missing)
   Sigma_coef <- Sigma[1:p_beta, 1:p_beta] + 
-    matA %*% 
-    Sigma[(p_beta+1):(p_beta+p_gamma), 1:p_beta] +
-    Sigma[(1:p_beta),(p_beta+1):(p_beta+p_gamma)] %*%
-    t(matA) +
+    matA %*% Sigma[(p_beta+1):(p_beta+p_gamma), 1:p_beta] +
+    Sigma[(1:p_beta),(p_beta+1):(p_beta+p_gamma)] %*% t(matA) +
     matA %*%
     Sigma[(p_beta+1):(p_beta+p_gamma), (p_beta+1):(p_beta+p_gamma)] %*% 
-    t(matA) +
+    t(matA) * n_total / n_avail +
     matA %*% 
     Sigma[(p_beta+1):(p_beta+p_gamma),(p_beta+1):(p_beta+p_gamma)] %*% 
-    t(matA)
+    t(matA) * n_total / n_missing 
   
   return(list(coef = coef,
               Sigma = Sigma_coef))

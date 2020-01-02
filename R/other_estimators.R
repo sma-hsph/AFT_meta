@@ -207,19 +207,19 @@ gehan.fib <- function(y, delta, matX, matZ,
   
   # Estimate Sigma
   # Currently this is estimated as average of Sigmas across studies scaled by n
-  ## FIXME??
+  ## FIXME
   Sigma <- 
     Reduce("+",
-                  lapply(1:length(lSigma), 
-                         function(i) lSigma[[i]] * (ns[i] - 1))) /
+           lapply(1:length(lSigma), 
+                  function(i) lSigma[[i]] * (ns[i] - 1))) / length(lSigma) / 
     (sum(ns[1:length(lSigma)]) - 1)
   Sigma[(p_beta+1):(p_beta + p_gamma), (p_beta+1):(p_beta + p_gamma)] <- 
     (Sigma[(p_beta+1):(p_beta + p_gamma), (p_beta+1):(p_beta + p_gamma)] * 
        (sum(ns[1:length(lSigma)]) - 1) +
        Reduce("+",
               lapply(1:length(lSigmaGamma), function(i) lSigmaGamma[[i]] * 
-                       (ns[length(lSigma) + i] - 1)))) /
-    (sum(ns) - 1)
+                       (ns[length(lSigma) + i] - 1))) / length(lSigmaGamma)) / 
+    2 / (sum(ns) - 1)
   
   return(beta.mle(betas = matBeta, gammas = matGamma, ns = ns, Sigma = Sigma))
 }
