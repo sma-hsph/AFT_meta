@@ -265,25 +265,19 @@ gehan.mi <- function(y, delta, matX, matZ,
     diag(predictorMatrix) <- 0
     predictorMatrix[-1, 1] <- -2
     method[(4 + pX):(3 + pX + pZ)] <- "2l.2stage.norm"
-    
-    mi_fit <- micemd::mice.par(df_imp, 
-                               predictorMatrix = predictorMatrix,
-                               method = method,
-                               m = m,
-                               nnodes = 1)
   } else {
     predictorMatrix[,] <- 1
     diag(predictorMatrix) <- 0
     predictorMatrix[, 1] <- 0
     predictorMatrix[1, ] <- 0
-    
     method[(4 + pX):(3 + pX + pZ)] <- "norm"
-    mi_fit <- micemd::mice.par(df_imp, 
-                               predictorMatrix = predictorMatrix,
-                               method = method,
-                               m = m,
-                               nnodes = 1)
   }
+  
+  mi_fit <- mice::mice(data = df_imp, 
+                       predictorMatrix = predictorMatrix,
+                       method = method,
+                       m = m,
+                       printFlag = FALSE)
   
   # generate beta estimate from each imputation and then average
   matCoef <- sapply(1:m, function(j) {
