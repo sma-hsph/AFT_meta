@@ -5,8 +5,18 @@
 \title{Fit AFT version of Fibrinogen{19222087} estimator to multipe studies with 
 systematically missing variables.}
 \usage{
-gehan.fib(y, delta, matX, matZ, study, missing, beta.ini = NULL,
-  gamma.ini = NULL, B = 30, ncores = 1)
+gehan.fib(
+  y,
+  delta,
+  matX,
+  matZ,
+  study,
+  missing,
+  beta.ini = NULL,
+  gamma.ini = NULL,
+  B = 30,
+  ncores = 1
+)
 }
 \arguments{
 \item{y}{length-n ceonsored log time-to-event variable}

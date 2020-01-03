@@ -5,7 +5,7 @@
 \title{Fit AFT version of multiple imputation{23857554} estimator to multipe studies with 
 systematically missing variables.}
 \usage{
-gehan.mi(y, delta, matX, matZ, study, missing, beta.ini = NULL, m = 5)
+gehan.mi(y, delta, matX, matZ, study, missing, beta.ini = NULL, m = 10)
 }
 \arguments{
 \item{y}{length-n ceonsored log time-to-event variable}

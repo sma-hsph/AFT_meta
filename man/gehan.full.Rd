@@ -4,8 +4,17 @@
 \alias{gehan.full}
 \title{Fit combined Gehan estimator to multipe studies with systematically missing variables.}
 \usage{
-gehan.full(y, delta, matX, matZ, study, missing, beta.ini = NULL,
-  B = 30, ncores = 1)
+gehan.full(
+  y,
+  delta,
+  matX,
+  matZ,
+  study,
+  missing,
+  beta.ini = NULL,
+  B = 30,
+  ncores = 1
+)
 }
 \arguments{
 \item{y}{length-n ceonsored log time-to-event variable}

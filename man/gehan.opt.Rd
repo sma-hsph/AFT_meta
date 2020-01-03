@@ -4,8 +4,18 @@
 \alias{gehan.opt}
 \title{Fit optimized Gehan estimator to multipe studies with systematically missing variables.}
 \usage{
-gehan.opt(y, delta, matX, matZ, study, missing, beta.ini = NULL,
-  B = 30, ncores = 1)
+gehan.opt(
+  y,
+  delta,
+  matX,
+  matZ,
+  study,
+  missing,
+  beta.ini = NULL,
+  B = 30,
+  ncores = 1,
+  indirect = FALSE
+)
 }
 \arguments{
 \item{y}{length-n ceonsored log time-to-event variable}

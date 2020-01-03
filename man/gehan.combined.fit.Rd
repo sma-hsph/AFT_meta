@@ -4,8 +4,16 @@
 \alias{gehan.combined.fit}
 \title{Combined (non-optimal) Gehan estimator for multiple studies}
 \usage{
-gehan.combined.fit(y, delta, matX, matZ, study, missing, wt = rep(1,
-  length(y)), beta.ini = NULL)
+gehan.combined.fit(
+  y,
+  delta,
+  matX,
+  matZ,
+  study,
+  missing,
+  wt = rep(1, length(y)),
+  beta.ini = NULL
+)
 }
 \arguments{
 \item{y}{length-n ceonsored log time-to-event variable}

@@ -5,8 +5,17 @@
 \title{Fit naive (i.e., only with full observations) Gehan estimator to multipe studies with 
 systematically missing variables.}
 \usage{
-gehan.obs(y, delta, matX, matZ, study, missing, beta.ini = NULL,
-  B = 30, ncores = 1)
+gehan.obs(
+  y,
+  delta,
+  matX,
+  matZ,
+  study,
+  missing,
+  beta.ini = NULL,
+  B = 30,
+  ncores = 1
+)
 }
 \arguments{
 \item{y}{length-n ceonsored log time-to-event variable}

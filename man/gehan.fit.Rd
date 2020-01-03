@@ -4,8 +4,7 @@
 \alias{gehan.fit}
 \title{Naive Gehan estimator for multiple studies}
 \usage{
-gehan.fit(y, delta, matX, study, wt = rep(1, length(y)),
-  beta.ini = NULL)
+gehan.fit(y, delta, matX, study, wt = rep(1, length(y)), beta.ini = NULL)
 }
 \arguments{
 \item{y}{length-n ceonsored log time-to-event variable}
