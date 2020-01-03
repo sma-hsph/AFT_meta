@@ -12,5 +12,5 @@ LazyData: true
 Imports:
   foreach,
   doParallel,
-  mice
+  micemd
 RoxygenNote: 6.1.1

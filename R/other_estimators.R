@@ -245,7 +245,7 @@ gehan.fib <- function(y, delta, matX, matZ,
 gehan.mi <- function(y, delta, matX, matZ,
                      study, missing,
                      beta.ini = NULL,
-                     m = 5){
+                     m = 10){
   matZ_imp <- matZ
   matZ_imp[missing, ] <- NA
   pX <- ncol(matX)
@@ -253,41 +253,42 @@ gehan.mi <- function(y, delta, matX, matZ,
   if(pZ != 1)
     stop("Currently only one systematically missing covariate is supported!")
   
-  df_lme <- as.data.frame(cbind(matZ, y, delta, matX, study))
-  formula_fixed <- as.formula(
-    paste(c(colnames(df_lme)[1], "~",
-            paste(colnames(df_lme)[2:(ncol(df_lme) - 1)],
-                  collapse = "+")),
-          collapse = "")
-  )
-  formula_random <- as.formula(
-    paste0("~1|", colnames(df_lme)[ncol(df_lme)])
-  )
-  fit_lme <- nlme::lme(fixed = formula_fixed, 
-                       data = df_lme, 
-                       random = formula_random)
-  
   # data frame for imputation
-  df_imp <- data.frame(y, delta, matX, matZ_imp)
-  # prediction matrix for multiple imputation
-  predictorMatrix <- rbind(matrix(0, nrow = 1, ncol = ncol(df_imp)),
-                           matrix(0, nrow = 1, ncol = ncol(df_imp)),
-                           matrix(0, nrow = pX, ncol = ncol(df_imp)),
-                           cbind(rep(1, pZ),
-                                 rep(1, pZ),
-                                 matrix(1, nrow = pZ, ncol = pX),
-                                 matrix(0, nrow = pZ, ncol = pZ))
-  )
-  mi_fit <- mice::mice(data = df_imp,
-                       m = m,
-                       meth = "norm",
-                       predictorMatrix = predictorMatrix,
-                       printFlag=F)
+  df_imp <- data.frame(study, y, delta, matX, matZ_imp)
+  predictorMatrix <- matrix(NA, nrow = ncol(df_imp), ncol = ncol(df_imp))
+  rownames(predictorMatrix) <- colnames(predictorMatrix) <- colnames(df_imp)
+  method <- rep("", ncol(df_imp))
+  names(method) <- colnames(df_imp)
+  if(length(unique(study[!missing])) > 1) {
+    # prediction matrix for multiple imputation
+    predictorMatrix[,] <- 2
+    diag(predictorMatrix) <- 0
+    predictorMatrix[-1, 1] <- -2
+    method[(4 + pX):(3 + pX + pZ)] <- "2l.2stage.norm"
+    
+    mi_fit <- micemd::mice.par(df_imp, 
+                               predictorMatrix = predictorMatrix,
+                               method = method,
+                               m = m,
+                               nnodes = 1)
+  } else {
+    predictorMatrix[,] <- 1
+    diag(predictorMatrix) <- 0
+    predictorMatrix[, 1] <- 0
+    predictorMatrix[1, ] <- 0
+    
+    method[(4 + pX):(3 + pX + pZ)] <- "norm"
+    mi_fit <- micemd::mice.par(df_imp, 
+                               predictorMatrix = predictorMatrix,
+                               method = method,
+                               m = m,
+                               nnodes = 1)
+  }
   
   # generate beta estimate from each imputation and then average
   matCoef <- sapply(1:m, function(j) {
     matZ_tmp <- matZ
-    matZ_tmp[missing, ] <- sapply(mi_fit$imp[(3 + pX):(2 + pX + pZ)], 
+    matZ_tmp[missing, ] <- sapply(mi_fit$imp[(4 + pX):(3 + pX + pZ)], 
                                   function(mat) mat[, j])
     gehan.fit(
       y = y,
