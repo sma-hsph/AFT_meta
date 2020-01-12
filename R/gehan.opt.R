@@ -88,14 +88,12 @@ gehan.opt <- function(y, delta, matX, matZ,
     coef_alpha <- apply(matAlphaPt, 1, mean)
     Sigma_alpha <- cov(t(matAlphaPt))
     
-    coef_indirect <- (coef_alpha * coef)[(ncol(matX) + 1):p]
+    coef_indirect <- coef_alpha * coef[(ncol(matX) + 1):p]
     matCoefPt <- matOpt %*% matBeta1Pt + (diag(1, p) - matOpt) %*% matBeta2Pt
     Sigma_indirect <- cov(t(vapply(seq_len(B),
                                    function(b) 
-                                     matAlphaPt[, b] * matCoefPt[, b],
-                                   rep(0.0, length(coef)))))[(ncol(matX) + 1):p,
-                                                             (ncol(matX) + 1):p,
-                                                             drop = FALSE]
+                                     matAlphaPt[, b] * matCoefPt[(ncol(matX) + 1):p, b],
+                                   rep(0.0, length(coef_alpha)))))
     fit <- 
       c(fit, 
         list(coef_alpha = coef_alpha, Sigma_alpha = Sigma_alpha,
