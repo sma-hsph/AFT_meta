@@ -242,10 +242,11 @@ gehan.fib <- function(y, delta, matX, matZ,
 #' @export
 #'
 #' @examples
-gehan.mi <- function(y, delta, matX, matZ,
+gehan.mi <- function(y, ey, delta, 
+                     matX, matZ,
                      study, missing,
                      beta.ini = NULL,
-                     m = 10){
+                     m = 10, B = 30, ncores = 1){
   matZ_imp <- matZ
   matZ_imp[missing, ] <- NA
   pX <- ncol(matX)
@@ -253,8 +254,15 @@ gehan.mi <- function(y, delta, matX, matZ,
   if(pZ != 1)
     stop("Currently only one systematically missing covariate is supported!")
   
+  coef_marginal <- gehan.fit(y = y,
+                             delta = delta,
+                             matX = matX,
+                             study = study,
+                             beta.ini = beta.ini)
+  ey <- matX %*% coef_marginal
+  
   # data frame for imputation
-  df_imp <- data.frame(study, y, delta, matX, matZ_imp)
+  df_imp <- data.frame(study, ey, delta, matX, matZ_imp)
   predictorMatrix <- matrix(NA, nrow = ncol(df_imp), ncol = ncol(df_imp))
   rownames(predictorMatrix) <- colnames(predictorMatrix) <- colnames(df_imp)
   method <- rep("", ncol(df_imp))
