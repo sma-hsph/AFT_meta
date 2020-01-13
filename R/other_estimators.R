@@ -21,7 +21,7 @@ gehan.obs <- function(y, delta, matX, matZ,
                       study, missing,
                       beta.ini = NULL,
                       B = 30,
-                      ncores = 1) {
+                      ncores = 1, indirect = FALSE) {
   # dimensions must agree
   if(length(y) != length(delta) | length(y) != nrow(matX) | length(y) != nrow(matZ) |
      length(y) != length(study) | length(y) != length(missing))
@@ -48,8 +48,34 @@ gehan.obs <- function(y, delta, matX, matZ,
                          matX = cbind(matX[!missing, , drop = F], matZ[!missing, , drop = F]),
                          study = study[!missing], beta.ini = beta.ini)
   Sigma <- cov(t(matBetaPt))
+
+  fit <- list(coef = coef, Sigma = Sigma)
+
+  if(indirect) {
+    if(ncol(matZ) != 1)
+      stop("Estimation of total indirect effect is not supported for",
+           " more than one mediators!")
+    matAlphaPt <- perturbfn(f = alpha.fit, matW = matW[!missing, ], 
+                            ncores = ncores,
+                            matX = matX[!missing, , drop = F], 
+                            matZ = matZ[!missing, , drop = F],
+                            study = study[!missing])
+    
+    coef_alpha <- apply(matAlphaPt, 1, mean)
+    Sigma_alpha <- cov(t(matAlphaPt))
+    
+    coef_indirect <- coef_alpha * coef[(ncol(matX) + 1):p]
+    Sigma_indirect <- cov(t(vapply(seq_len(B),
+                                   function(b) 
+                                     matAlphaPt[, b] * matBetaPt[(ncol(matX) + 1):p, b],
+                                   rep(0.0, length(coef_alpha)))))
+    fit <- 
+      c(fit, 
+        list(coef_alpha = coef_alpha, Sigma_alpha = Sigma_alpha,
+             coef_indirect = coef_indirect, Sigma_indirect = Sigma_indirect))
+  }
   
-  return(list(coef = coef, Sigma = Sigma))
+  return(fit)
 }
 
 #' Fit combined Gehan estimator to multipe studies with systematically missing variables.
