@@ -268,9 +268,11 @@ gehan.fib <- function(y, delta, matX, matZ,
 #' @export
 #'
 #' @examples
-gehan.mi <- function(y, ey, delta, 
+gehan.mi <- function(y, delta, 
                      matX, matZ,
                      study, missing,
+                     surv_est = "none",
+                     surv_use = "H",
                      beta.ini = NULL,
                      m = 10, B = 30, ncores = 1){
   matZ_imp <- matZ
@@ -280,15 +282,43 @@ gehan.mi <- function(y, ey, delta,
   if(pZ != 1)
     stop("Currently only one systematically missing covariate is supported!")
   
-  coef_marginal <- gehan.fit(y = y,
-                             delta = delta,
-                             matX = matX,
-                             study = study,
-                             beta.ini = beta.ini)
-  ey <- matX %*% coef_marginal
-  
   # data frame for imputation
-  df_imp <- data.frame(study, ey, delta, matX, matZ_imp)
+  df_imp <- data.frame(study, y, delta, matX, matZ_imp)
+  
+  if(surv_est != "none") {
+    surv_val <- rep(NA_real_, length(y))
+    if(surv_est == "marg") { 
+      for(i.study in unique(study)) {
+        i.ind <- study == i.study
+        i.fit.surv <- survival::survfit(survival::Surv(exp(y[i.ind]),
+                                                     delta[i.ind]) ~ 1)
+        surv_val[i.ind] <- i.fit.surv$cumhaz[match(exp(y[i.ind]), 
+                                               i.fit.surv$time)]
+      }
+    }
+    if(surv_est == "cond") { 
+      coef_marginal <- gehan.fit(y = y,
+                                 delta = delta,
+                                 matX = matX,
+                                 study = study,
+                                 beta.ini = beta.ini)
+      epsilon <- as.vector(y - matX %*% coef_marginal)
+      for(i.study in unique(study)) {
+        i.ind <- study == i.study
+        i.fit.surv <- survival::survfit(survival::Surv(exp(epsilon[i.ind]),
+                                                     delta[i.ind]) ~ 1,
+                                      type="kaplan-meier")
+        surv_val[i.ind] <- i.fit.surv$cumhaz[match(exp(epsilon[i.ind]), 
+                                               i.fit.surv$time)]
+      }
+    }
+    
+    if(surv_use == "S")
+      surv_val <- exp(-surv_val)
+    
+    df_imp$surv_val <- surv_val
+  }
+  
   predictorMatrix <- matrix(NA, nrow = ncol(df_imp), ncol = ncol(df_imp))
   rownames(predictorMatrix) <- colnames(predictorMatrix) <- colnames(df_imp)
   method <- rep("", ncol(df_imp))
