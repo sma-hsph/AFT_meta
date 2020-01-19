@@ -292,8 +292,10 @@ gehan.mi <- function(y, delta,
         i.ind <- study == i.study
         i.fit.surv <- survival::survfit(survival::Surv(exp(y[i.ind]),
                                                        delta[i.ind]) ~ 1)
-        surv_val[i.ind] <- i.fit.surv$cumhaz[match(rank(y[i.ind]), 
-                                                   rank(i.fit.surv$time))]
+        surv_val[i.ind] <- i.fit.surv$cumhaz[match(rank(y[i.ind], 
+                                                        ties.method = "first"), 
+                                                   rank(i.fit.surv$time,
+                                                        ties.method = "first"))]
       }
     }
     if(surv_est == "cond") { 
@@ -308,8 +310,10 @@ gehan.mi <- function(y, delta,
         i.fit.surv <- survival::survfit(survival::Surv(exp(epsilon[i.ind]),
                                                      delta[i.ind]) ~ 1,
                                       type="kaplan-meier")
-        surv_val[i.ind] <- i.fit.surv$cumhaz[match(rank(epsilon[i.ind]), 
-                                                   rank(i.fit.surv$time))]
+        surv_val[i.ind] <- i.fit.surv$cumhaz[match(rank(epsilon[i.ind],
+                                                        ties.method = "first"), 
+                                                   rank(i.fit.surv$time,
+                                                        ties.method = "first"))]
       }
     }
     
