@@ -48,9 +48,9 @@ gehan.obs <- function(y, delta, matX, matZ,
                          matX = cbind(matX[!missing, , drop = F], matZ[!missing, , drop = F]),
                          study = study[!missing], beta.ini = beta.ini)
   Sigma <- cov(t(matBetaPt))
-
+  
   fit <- list(coef = coef, Sigma = Sigma)
-
+  
   if(indirect) {
     if(ncol(matZ) != 1)
       stop("Estimation of total indirect effect is not supported for",
@@ -115,7 +115,7 @@ gehan.full <- function(y, delta, matX, matZ,
   
   # combined estimator
   coef <- gehan.combined.fit(y = y, delta = delta, matX = matX, matZ = matZ,
-                              study = study, missing = missing, beta.ini = beta.ini)
+                             study = study, missing = missing, beta.ini = beta.ini)
   
   
   # perturb to estimate Sigma
@@ -123,8 +123,8 @@ gehan.full <- function(y, delta, matX, matZ,
   p <- ncol(matX) + ncol(matZ)
   matW <- matrix(rexp(n*B), nrow=n, ncol=B)
   matBetaPt <- perturbfn(f = gehan.combined.fit, matW = matW, ncores = ncores,
-                          y = y, delta = delta, matX = matX, matZ = matZ,
-                          study = study, missing = missing, beta.ini = beta.ini)
+                         y = y, delta = delta, matX = matX, matZ = matZ,
+                         study = study, missing = missing, beta.ini = beta.ini)
   Sigma <- cov(t(matBetaPt))
   
   return(list(coef = coef, Sigma = Sigma))
@@ -290,12 +290,10 @@ gehan.mi <- function(y, delta,
     if(surv_est == "marg") { 
       for(i.study in unique(study)) {
         i.ind <- study == i.study
-        i.fit.surv <- survival::survfit(survival::Surv(exp(y[i.ind]),
-                                                       delta[i.ind]) ~ 1)
-        surv_val[i.ind] <- i.fit.surv$cumhaz[match(rank(y[i.ind], 
-                                                        ties.method = "first"), 
-                                                   rank(i.fit.surv$time,
-                                                        ties.method = "first"))]
+        surv_val[i.ind] <- 
+          mice::nelsonaalen(data.frame(time = exp(y[i.ind]),
+                                       event = delta),
+                            "time", "event")
       }
     }
     if(surv_est == "cond") { 
@@ -307,18 +305,18 @@ gehan.mi <- function(y, delta,
       epsilon <- as.vector(y - matX %*% coef_marginal)
       for(i.study in unique(study)) {
         i.ind <- study == i.study
-        i.fit.surv <- survival::survfit(survival::Surv(exp(epsilon[i.ind]),
-                                                     delta[i.ind]) ~ 1,
-                                      type="kaplan-meier")
-        surv_val[i.ind] <- i.fit.surv$cumhaz[match(rank(epsilon[i.ind],
-                                                        ties.method = "first"), 
-                                                   rank(i.fit.surv$time,
-                                                        ties.method = "first"))]
+        surv_val[i.ind] <- 
+          mice::nelsonaalen(data.frame(time = exp(epsilon[i.ind]),
+                                       event = delta),
+                            "time", "event")
       }
     }
     
     if(surv_use == "S")
       surv_val <- exp(-surv_val)
+    
+    # for the very weird case where time points are missing in survfit
+    
     
     df_imp$surv_val <- surv_val
   }
@@ -366,5 +364,5 @@ gehan.mi <- function(y, delta,
               Sigma = NULL ## FIXME It's not clear to me how to compute Sigma
               # Given that perturbation can't be incorporated into multiple 
               # imputation
-              ))
+  ))
 }
