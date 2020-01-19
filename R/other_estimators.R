@@ -292,7 +292,7 @@ gehan.mi <- function(y, delta,
         i.ind <- study == i.study
         surv_val[i.ind] <- 
           mice::nelsonaalen(data.frame(time = exp(y[i.ind]),
-                                       event = delta),
+                                       event = delta[i.ind]),
                             "time", "event")
       }
     }
@@ -307,7 +307,7 @@ gehan.mi <- function(y, delta,
         i.ind <- study == i.study
         surv_val[i.ind] <- 
           mice::nelsonaalen(data.frame(time = exp(epsilon[i.ind]),
-                                       event = delta),
+                                       event = delta[i.ind]),
                             "time", "event")
       }
     }
