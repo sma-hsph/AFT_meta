@@ -61,7 +61,9 @@ gehan.obs <- function(y, delta, matX, matZ,
                             matZ = matZ[!missing, , drop = F],
                             study = study[!missing])
     
-    coef_alpha <- apply(matAlphaPt, 1, mean)
+    coef_alpha <- as.vector(alpha.fit(matZ = matZ[!missing, , drop = F], 
+                                      matX = matX[!missing, , drop = F], 
+                                      study = study[!missing]))
     Sigma_alpha <- cov(t(matAlphaPt))
     
     coef_indirect <- coef_alpha * coef[(ncol(matX) + 1):p]
