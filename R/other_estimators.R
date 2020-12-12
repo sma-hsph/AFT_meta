@@ -368,3 +368,122 @@ gehan.mi <- function(y, delta,
               # imputation
   ))
 }
+
+#' Fit AFT version of multiple imputation with random to multiple studies with 
+#' systematically missing variables.
+#'
+#' @param y length-n ceonsored log time-to-event variable
+#' @param delta length-n censoring indicator 1=event 0=censored
+#' @param matX n*p_X matrix of always observed covariates
+#' @param matZ n*p_Z matrix of systematically missing covariates
+#' @param study length-n study indicator
+#' @param missing length-n TRUE/FALSE missingness indicator TRUE=Z is missing FALSE=not missing
+#' @param beta.ini initial coefficient value for optimization; will estimate from lm if not
+#' provided
+#' @param m number of multiple imputations
+#'
+#' @return A list object with component coef for estimated coefficients and Sigma for estimated 
+#' covariance matrix. Currently covariance is not provided
+#' @export
+#'
+#' @examples
+gehan.2lmi <- function(y, delta, 
+                       matX, matZ,
+                       study, missing,
+                       surv_est = "none",
+                       surv_use = "H",
+                       beta.ini = NULL,
+                       m = 10, B = 30, ncores = 1){
+  matZ_imp <- matZ
+  matZ_imp[missing, ] <- NA
+  pX <- ncol(matX)
+  pZ <- ncol(matZ)
+  # if(pZ != 1)
+  #   stop("Currently only one systematically missing covariate is supported!")
+  
+  # # data frame for imputation
+  # df_imp <- data.frame(study, y, delta, matX, matZ_imp)
+  # 
+  # if(surv_est != "none") {
+  #   surv_val <- rep(NA_real_, length(y))
+  #   if(surv_est == "marg") { 
+  #     for(i.study in unique(study)) {
+  #       i.ind <- study == i.study
+  #       surv_val[i.ind] <- 
+  #         mice::nelsonaalen(data.frame(time = exp(y[i.ind]),
+  #                                      event = delta[i.ind]),
+  #                           "time", "event")
+  #     }
+  #   }
+  #   if(surv_est == "cond") { 
+  #     coef_marginal <- gehan.fit(y = y,
+  #                                delta = delta,
+  #                                matX = matX,
+  #                                study = study,
+  #                                beta.ini = beta.ini)
+  #     epsilon <- as.vector(y - matX %*% coef_marginal)
+  #     for(i.study in unique(study)) {
+  #       i.ind <- study == i.study
+  #       surv_val[i.ind] <- 
+  #         mice::nelsonaalen(data.frame(time = exp(epsilon[i.ind]),
+  #                                      event = delta[i.ind]),
+  #                           "time", "event")
+  #     }
+  #   }
+  #   
+  #   if(surv_use == "S")
+  #     surv_val <- exp(-surv_val)
+  #   
+  #   # for the very weird case where time points are missing in survfit
+  #   
+  #   
+  #   df_imp$surv_val <- surv_val
+  # }
+  # 
+  # predictorMatrix <- matrix(NA, nrow = ncol(df_imp), ncol = ncol(df_imp))
+  # rownames(predictorMatrix) <- colnames(predictorMatrix) <- colnames(df_imp)
+  # method <- rep("", ncol(df_imp))
+  # names(method) <- colnames(df_imp)
+  # if(length(unique(study[!missing])) > 1) {
+  #   # prediction matrix for multiple imputation
+  #   predictorMatrix[,] <- 2
+  #   diag(predictorMatrix) <- 0
+  #   predictorMatrix[-1, 1] <- -2
+  #   method[(4 + pX):(3 + pX + pZ)] <- "2l.2stage.norm"
+  # } else {
+  #   predictorMatrix[,] <- 1
+  #   diag(predictorMatrix) <- 0
+  #   predictorMatrix[, 1] <- 0
+  #   predictorMatrix[1, ] <- 0
+  #   method[(4 + pX):(3 + pX + pZ)] <- "norm"
+  # }
+  
+  # generate beta estimate from each imputation and then average
+  matCoef <- sapply(1:m, function(j) {
+    matZ_tmp <- matZ
+    matZ_tmp[missing, ] <- 
+      sapply(seq(1, pZ), 
+             function(iZ) {
+               micemd::mice.impute.2l.2stage.norm(
+                 y = matZ_imp[, iZ, drop = TRUE],
+                 ry = !missing,
+                 x = cbind(matX, y, delta, study),
+                 type = c(rep(2, length = pX + 2), -2)
+               ) 
+             })
+    gehan.fit(
+      y = y,
+      delta = delta,
+      matX = cbind(matX, matZ_tmp),
+      study = study,
+      beta.ini = beta.ini
+    )
+  })
+  coef <- apply(matCoef, 1, mean)
+  
+  return(list(coef = coef,
+              Sigma = NULL ## FIXME It's not clear to me how to compute Sigma
+              # Given that perturbation can't be incorporated into multiple 
+              # imputation
+  ))
+}
