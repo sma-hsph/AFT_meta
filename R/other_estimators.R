@@ -392,6 +392,7 @@ gehan.2lmi <- function(y, delta,
                        study, missing,
                        surv_est = "none",
                        surv_use = "H",
+                       use_y = TRUE,
                        beta.ini = NULL,
                        m = 10, B = 30, ncores = 1){
   matZ_imp <- matZ
@@ -459,6 +460,11 @@ gehan.2lmi <- function(y, delta,
   # }
   
   # generate beta estimate from each imputation and then average
+  if(use_y)
+    mat_predictor <- cbind(matX, y, delta, study)
+  else
+    mat_predictor <- cbind(matX, study)
+  
   matCoef <- sapply(1:m, function(j) {
     matZ_tmp <- matZ
     matZ_tmp[missing, ] <- 
@@ -467,8 +473,9 @@ gehan.2lmi <- function(y, delta,
                micemd::mice.impute.2l.2stage.norm(
                  y = matZ_imp[, iZ, drop = TRUE],
                  ry = !missing,
-                 x = cbind(matX, y, delta, study),
-                 type = c(rep(2, length = pX + 2), -2)
+                 x = mat_predictor,
+                 type = c(rep(2, length = ncol(mat_predictor) - 1), 
+                          -2)
                ) 
              })
     gehan.fit(
